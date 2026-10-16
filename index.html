@@ -1,0 +1,585 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>LCD Game & Watch - Wolf & Eggs</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link href="https://fonts.googleapis.com/css2?family=Chakra+Petch:wght@500;700&family=Press+Start+2P&display=swap" rel="stylesheet">
+    <style>
+        body {
+            font-family: 'Chakra Petch', sans-serif;
+            background-color: #0f172a;
+            user-select: none;
+            -webkit-user-select: none;
+            touch-action: manipulation;
+        }
+
+        /* Metallic LCD Handheld Chassis */
+        .handheld-chassis {
+            background: linear-gradient(135deg, #c5a059 0%, #edd395 30%, #a27a36 70%, #634819 100%);
+            box-shadow: 0 20px 50px rgba(0, 0, 0, 0.8), inset 0 2px 5px rgba(255, 255, 255, 0.6), inset 0 -4px 10px rgba(0,0,0,0.6);
+            border: 4px solid #3d2a0f;
+        }
+
+        .chassis-inner {
+            background: #e2e8f0;
+            background-image: radial-gradient(#cbd5e1 1px, transparent 0);
+            background-size: 8px 8px;
+            box-shadow: inset 0 0 15px rgba(0,0,0,0.3);
+        }
+
+        /* LCD Screen Ambient & Grid */
+        .lcd-viewport {
+            background-color: #9ea78c;
+            background-image: 
+                linear-gradient(rgba(0, 0, 0, 0.04) 50%, rgba(0, 0, 0, 0.1) 50%),
+                linear-gradient(90deg, rgba(0, 0, 0, 0.03), rgba(0, 0, 0, 0.03));
+            background-size: 100% 4px, 4px 100%;
+            border: 6px solid #1e293b;
+            box-shadow: inset 0 0 25px rgba(0, 0, 0, 0.4), 0 5px 15px rgba(0,0,0,0.3);
+            position: relative;
+        }
+
+        /* LCD Digital Numbers */
+        .lcd-number {
+            font-family: 'Press Start 2P', monospace;
+            color: #1a2e1a;
+            text-shadow: 0 0 2px rgba(26, 46, 26, 0.2);
+        }
+
+        /* Segment Styles */
+        .lcd-seg {
+            opacity: 0.06; /* Ghost segment background */
+            transition: opacity 0.03s ease;
+        }
+
+        .lcd-seg.active {
+            opacity: 0.92;
+            filter: drop-shadow(0px 0px 1px rgba(0,20,0,0.6));
+        }
+
+        .lcd-seg.miss-active {
+            opacity: 0.95;
+            color: #3b0707;
+        }
+
+        /* Red Push Buttons */
+        .red-btn {
+            background: radial-gradient(circle at 30% 30%, #ef4444, #991b1b);
+            box-shadow: 0 6px 0 #7f1d1d, 0 10px 15px rgba(0, 0, 0, 0.5);
+            transition: all 0.05s ease;
+        }
+
+        .red-btn:active {
+            transform: translateY(4px);
+            box-shadow: 0 2px 0 #7f1d1d, 0 4px 8px rgba(0, 0, 0, 0.5);
+        }
+
+        .small-btn {
+            background: linear-gradient(to bottom, #64748b, #334155);
+            box-shadow: 0 3px 0 #1e293b, 0 4px 6px rgba(0,0,0,0.4);
+        }
+        .small-btn:active {
+            transform: translateY(2px);
+            box-shadow: 0 1px 0 #1e293b;
+        }
+    </style>
+</head>
+<body class="min-h-screen flex items-center justify-center p-2 sm:p-4">
+
+    <!-- GAME & WATCH HANDHELD CONTAINER -->
+    <div class="handheld-chassis w-full max-w-2xl rounded-3xl p-4 sm:p-8 relative flex flex-col items-center">
+        
+        <!-- Top Branding / Model Header -->
+        <div class="w-full flex justify-between items-center mb-3 px-2">
+            <div class="flex items-center gap-2">
+                <span class="text-xs sm:text-sm font-bold text-amber-950 tracking-wider">GAME & WATCH</span>
+                <span class="text-[10px] sm:text-xs font-bold bg-amber-950 text-amber-200 px-2 py-0.5 rounded">EGGS-2026</span>
+            </div>
+            <h1 class="text-sm sm:text-xl font-extrabold text-amber-950 tracking-widest drop-shadow-sm">WOLF & EGGS</h1>
+            <div class="text-[10px] sm:text-xs font-bold text-amber-950">WIDE SCREEN</div>
+        </div>
+
+        <!-- Inner Bezel -->
+        <div class="chassis-inner w-full rounded-2xl p-3 sm:p-5 border-2 border-amber-900/40 relative flex flex-col items-center">
+            
+            <!-- LCD SCREEN -->
+            <div id="lcdScreen" class="lcd-viewport w-full aspect-[4/3] rounded-xl overflow-hidden relative p-3 flex flex-col justify-between">
+                
+                <!-- LCD Top Display Bar (Score & Misses) -->
+                <div class="w-full flex justify-between items-start z-10">
+                    <!-- Left: Game Mode / High Score -->
+                    <div class="flex flex-col">
+                        <div class="flex gap-2 text-[9px] sm:text-xs font-bold text-slate-800">
+                            <span id="gameModeLabel">GAME A</span>
+                        </div>
+                        <div class="text-[8px] sm:text-[10px] text-slate-700 font-bold mt-1">
+                            HI: <span id="hiScoreText" class="lcd-number">0000</span>
+                        </div>
+                    </div>
+
+                    <!-- Right: Digital Score & Miss Indicators -->
+                    <div class="flex flex-col items-end">
+                        <div class="flex items-center gap-1">
+                            <span class="text-[9px] sm:text-xs font-bold text-slate-800 mr-1">SCORE</span>
+                            <span id="scoreText" class="lcd-number text-lg sm:text-2xl font-bold tracking-widest">0000</span>
+                        </div>
+                        <!-- Misses Display (Broken Eggs / Chicks) -->
+                        <div class="flex gap-1.5 mt-1 items-center">
+                            <span class="text-[8px] font-bold text-slate-700">MISS</span>
+                            <div id="miss1" class="lcd-seg text-xs sm:text-sm">🐣</div>
+                            <div id="miss2" class="lcd-seg text-xs sm:text-sm">🐣</div>
+                            <div id="miss3" class="lcd-seg text-xs sm:text-sm">🐣</div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- LCD PLAYFIELD (SVG SEGMENTS LAYER) -->
+                <div class="absolute inset-0 w-full h-full p-2 pointer-events-none">
+                    <svg viewBox="0 0 400 300" class="w-full h-full">
+                        <defs>
+                            <!-- Filter for subtle LCD segment look -->
+                            <filter id="lcdGlow">
+                                <feDropShadow dx="0" dy="0" stdDeviation="0.5" flood-color="#102010"/>
+                            </filter>
+                        </defs>
+
+                        <!-- STATIC CHICKEN COOPS & SLIDES (BACKGROUND PRINT) -->
+                        <!-- Upper Left Coop & Ramp -->
+                        <path d="M 20 40 L 70 40 L 70 65 L 20 65 Z" fill="none" stroke="#2a382a" stroke-width="2" opacity="0.4"/>
+                        <line x1="70" y1="65" x2="160" y2="105" stroke="#2a382a" stroke-width="3" opacity="0.5"/>
+                        <text x="30" y="58" font-size="20" opacity="0.6">🐔</text>
+
+                        <!-- Lower Left Coop & Ramp -->
+                        <path d="M 20 160 L 70 160 L 70 185 L 20 185 Z" fill="none" stroke="#2a382a" stroke-width="2" opacity="0.4"/>
+                        <line x1="70" y1="185" x2="160" y2="225" stroke="#2a382a" stroke-width="3" opacity="0.5"/>
+                        <text x="30" y="178" font-size="20" opacity="0.6">🐔</text>
+
+                        <!-- Upper Right Coop & Ramp -->
+                        <path d="M 330 40 L 380 40 L 380 65 L 330 65 Z" fill="none" stroke="#2a382a" stroke-width="2" opacity="0.4"/>
+                        <line x1="330" y1="65" x2="240" y2="105" stroke="#2a382a" stroke-width="3" opacity="0.5"/>
+                        <text x="340" y="58" font-size="20" opacity="0.6">🐔</text>
+
+                        <!-- Lower Right Coop & Ramp -->
+                        <path d="M 330 160 L 380 160 L 380 185 L 330 185 Z" fill="none" stroke="#2a382a" stroke-width="2" opacity="0.4"/>
+                        <line x1="330" y1="185" x2="240" y2="225" stroke="#2a382a" stroke-width="3" opacity="0.5"/>
+                        <text x="340" y="178" font-size="20" opacity="0.6">🐔</text>
+
+                        <!-- Ground Line -->
+                        <line x1="10" y1="280" x2="390" y2="280" stroke="#2a382a" stroke-width="2" stroke-dasharray="4" opacity="0.4"/>
+
+                        <!-- ================= LCD EGG SEGMENTS (16 POSITIONS) ================= -->
+                        <!-- Upper Left Ramp Eggs (4 Segments: UL0 to UL3) -->
+                        <g id="seg-egg-UL0" class="lcd-seg"><ellipse cx="80" cy="65" rx="6" ry="8" transform="rotate(-25 80 65)" fill="#112211"/></g>
+                        <g id="seg-egg-UL1" class="lcd-seg"><ellipse cx="105" cy="77" rx="6" ry="8" transform="rotate(-25 105 77)" fill="#112211"/></g>
+                        <g id="seg-egg-UL2" class="lcd-seg"><ellipse cx="130" cy="88" rx="6" ry="8" transform="rotate(-25 130 88)" fill="#112211"/></g>
+                        <g id="seg-egg-UL3" class="lcd-seg"><ellipse cx="155" cy="100" rx="6" ry="8" transform="rotate(-25 155 100)" fill="#112211"/></g>
+
+                        <!-- Lower Left Ramp Eggs (4 Segments: DL0 to DL3) -->
+                        <g id="seg-egg-DL0" class="lcd-seg"><ellipse cx="80" cy="185" rx="6" ry="8" transform="rotate(-25 80 185)" fill="#112211"/></g>
+                        <g id="seg-egg-DL1" class="lcd-seg"><ellipse cx="105" cy="197" rx="6" ry="8" transform="rotate(-25 105 197)" fill="#112211"/></g>
+                        <g id="seg-egg-DL2" class="lcd-seg"><ellipse cx="130" cy="208" rx="6" ry="8" transform="rotate(-25 130 208)" fill="#112211"/></g>
+                        <g id="seg-egg-DL3" class="lcd-seg"><ellipse cx="155" cy="220" rx="6" ry="8" transform="rotate(-25 155 220)" fill="#112211"/></g>
+
+                        <!-- Upper Right Ramp Eggs (4 Segments: UR0 to UR3) -->
+                        <g id="seg-egg-UR0" class="lcd-seg"><ellipse cx="320" cy="65" rx="6" ry="8" transform="rotate(25 320 65)" fill="#112211"/></g>
+                        <g id="seg-egg-UR1" class="lcd-seg"><ellipse cx="295" cy="77" rx="6" ry="8" transform="rotate(25 295 77)" fill="#112211"/></g>
+                        <g id="seg-egg-UR2" class="lcd-seg"><ellipse cx="270" cy="88" rx="6" ry="8" transform="rotate(25 270 88)" fill="#112211"/></g>
+                        <g id="seg-egg-UR3" class="lcd-seg"><ellipse cx="245" cy="100" rx="6" ry="8" transform="rotate(25 245 100)" fill="#112211"/></g>
+
+                        <!-- Lower Right Ramp Eggs (4 Segments: DR0 to DR3) -->
+                        <g id="seg-egg-DR0" class="lcd-seg"><ellipse cx="320" cy="185" rx="6" ry="8" transform="rotate(25 320 185)" fill="#112211"/></g>
+                        <g id="seg-egg-DR1" class="lcd-seg"><ellipse cx="295" cy="197" rx="6" ry="8" transform="rotate(25 295 197)" fill="#112211"/></g>
+                        <g id="seg-egg-DR2" class="lcd-seg"><ellipse cx="270" cy="208" rx="6" ry="8" transform="rotate(25 270 208)" fill="#112211"/></g>
+                        <g id="seg-egg-DR3" class="lcd-seg"><ellipse cx="245" cy="220" rx="6" ry="8" transform="rotate(25 245 220)" fill="#112211"/></g>
+
+                        <!-- ================= BROKEN EGGS ON GROUND (SPLASH SEGMENTS) ================= -->
+                        <g id="seg-miss-L" class="lcd-seg">
+                            <path d="M 145 275 L 155 265 L 165 275 L 175 268 L 180 278 Z" fill="#112211"/>
+                            <text x="142" y="260" font-size="14">🐣</text>
+                        </g>
+                        <g id="seg-miss-R" class="lcd-seg">
+                            <path d="M 220 278 L 225 268 L 235 275 L 245 265 L 255 275 Z" fill="#112211"/>
+                            <text x="242" y="260" font-size="14">🐣</text>
+                        </g>
+
+                        <!-- ================= WOLF / CATCHER SEGMENTS (4 POSITIONS) ================= -->
+                        <!-- Catcher Top-Left (UL) -->
+                        <g id="seg-catcher-UL" class="lcd-seg">
+                            <!-- Wolf facing Left, Hat raised up left -->
+                            <circle cx="185" cy="130" r="14" fill="#112211"/> <!-- Head -->
+                            <path d="M 175 140 L 210 140 L 205 195 L 180 195 Z" fill="#112211"/> <!-- Body -->
+                            <path d="M 180 135 L 155 105 L 170 95 Z" fill="#112211"/> <!-- Raised Left Arm & Hat -->
+                            <path d="M 148 90 C 148 90, 172 85, 175 105 Z" fill="#112211"/> <!-- Hat/Basket -->
+                        </g>
+
+                        <!-- Catcher Down-Left (DL) -->
+                        <g id="seg-catcher-DL" class="lcd-seg">
+                            <circle cx="185" cy="150" r="14" fill="#112211"/>
+                            <path d="M 175 160 L 210 160 L 205 215 L 180 215 Z" fill="#112211"/>
+                            <path d="M 180 165 L 155 220 L 170 228 Z" fill="#112211"/> <!-- Lower Arm -->
+                            <path d="M 148 210 C 148 210, 172 205, 175 228 Z" fill="#112211"/>
+                        </g>
+
+                        <!-- Catcher Top-Right (UR) -->
+                        <g id="seg-catcher-UR" class="lcd-seg">
+                            <circle cx="215" cy="130" r="14" fill="#112211"/>
+                            <path d="M 190 140 L 225 140 L 220 195 L 195 195 Z" fill="#112211"/>
+                            <path d="M 220 135 L 245 105 L 230 95 Z" fill="#112211"/> <!-- Raised Right Arm -->
+                            <path d="M 252 90 C 252 90, 228 85, 225 105 Z" fill="#112211"/>
+                        </g>
+
+                        <!-- Catcher Down-Right (DR) -->
+                        <g id="seg-catcher-DR" class="lcd-seg">
+                            <circle cx="215" cy="150" r="14" fill="#112211"/>
+                            <path d="M 190 160 L 225 160 L 220 215 L 195 215 Z" fill="#112211"/>
+                            <path d="M 220 165 L 245 220 L 230 228 Z" fill="#112211"/>
+                            <path d="M 252 210 C 252 210, 228 205, 225 228 Z" fill="#112211"/>
+                        </g>
+
+                    </svg>
+                </div>
+
+                <!-- OVERLAY BANNER (Start / Game Over Screen) -->
+                <div id="lcdOverlay" class="absolute inset-0 bg-slate-900/80 z-20 flex flex-col items-center justify-center p-4 text-center">
+                    <h2 id="overlayTitle" class="text-amber-400 text-sm sm:text-lg font-bold mb-2">GAME & WATCH</h2>
+                    <p id="overlayMessage" class="text-slate-200 text-xs sm:text-sm mb-4 max-w-xs">Press START or use the Directional Buttons to Catch Eggs!</p>
+                    <button id="startBtn" class="small-btn text-white text-xs sm:text-sm font-bold px-6 py-2.5 rounded-md border border-slate-400 tracking-wider">
+                        START GAME A
+                    </button>
+                </div>
+
+            </div>
+
+            <!-- CONTROLS & BUTTONS PANEL ON CHASSIS -->
+            <div class="w-full mt-4 flex justify-between items-center px-1 sm:px-4">
+                
+                <!-- Left Buttons (UL / DL) -->
+                <div class="flex flex-col gap-3 sm:gap-4 items-center">
+                    <button id="btnUL" class="red-btn w-12 h-12 sm:w-16 sm:h-16 rounded-full flex flex-col items-center justify-center text-white font-black text-xs sm:text-sm border-2 border-red-900">
+                        <span>↖</span>
+                        <span class="text-[7px] sm:text-[9px] font-bold">UL</span>
+                    </button>
+                    <button id="btnDL" class="red-btn w-12 h-12 sm:w-16 sm:h-16 rounded-full flex flex-col items-center justify-center text-white font-black text-xs sm:text-sm border-2 border-red-900">
+                        <span>↙</span>
+                        <span class="text-[7px] sm:text-[9px] font-bold">DL</span>
+                    </button>
+                </div>
+
+                <!-- Center Function Buttons -->
+                <div class="flex flex-col items-center gap-2">
+                    <div class="flex gap-2">
+                        <button id="btnGameA" class="small-btn text-[8px] sm:text-[10px] text-slate-200 font-bold px-2.5 py-1 rounded">GAME A</button>
+                        <button id="btnGameB" class="small-btn text-[8px] sm:text-[10px] text-slate-200 font-bold px-2.5 py-1 rounded">GAME B</button>
+                    </div>
+                    <span class="text-[9px] sm:text-[11px] font-bold text-amber-950 mt-1">KEYS: Q / A | E / D</span>
+                </div>
+
+                <!-- Right Buttons (UR / DR) -->
+                <div class="flex flex-col gap-3 sm:gap-4 items-center">
+                    <button id="btnUR" class="red-btn w-12 h-12 sm:w-16 sm:h-16 rounded-full flex flex-col items-center justify-center text-white font-black text-xs sm:text-sm border-2 border-red-900">
+                        <span>↗</span>
+                        <span class="text-[7px] sm:text-[9px] font-bold">UR</span>
+                    </button>
+                    <button id="btnDR" class="red-btn w-12 h-12 sm:w-16 sm:h-16 rounded-full flex flex-col items-center justify-center text-white font-black text-xs sm:text-sm border-2 border-red-900">
+                        <span>↘</span>
+                        <span class="text-[7px] sm:text-[9px] font-bold">DR</span>
+                    </button>
+                </div>
+
+            </div>
+
+        </div>
+
+    </div>
+
+    <script>
+        // ================= WEB AUDIO SYNTHESIZER =================
+        let audioCtx = null;
+
+        function initAudio() {
+            if (!audioCtx) {
+                audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+            }
+            if (audioCtx.state === 'suspended') {
+                audioCtx.resume();
+            }
+        }
+
+        function playBeep(type) {
+            if (!audioCtx) return;
+            try {
+                const osc = audioCtx.createOscillator();
+                const gain = audioCtx.createGain();
+                osc.connect(gain);
+                gain.connect(audioCtx.destination);
+                const t = audioCtx.currentTime;
+
+                if (type === 'tick') { // Standard step sound
+                    osc.type = 'square';
+                    osc.frequency.setValueAtTime(1200, t);
+                    gain.gain.setValueAtTime(0.05, t);
+                    gain.gain.exponentialRampToValueAtTime(0.001, t + 0.03);
+                    osc.start(t);
+                    osc.stop(t + 0.03);
+                } else if (type === 'move') { // Catcher movement
+                    osc.type = 'triangle';
+                    osc.frequency.setValueAtTime(600, t);
+                    gain.gain.setValueAtTime(0.08, t);
+                    gain.gain.exponentialRampToValueAtTime(0.001, t + 0.04);
+                    osc.start(t);
+                    osc.stop(t + 0.04);
+                } else if (type === 'catch') { // Successful egg catch
+                    osc.type = 'square';
+                    osc.frequency.setValueAtTime(800, t);
+                    osc.frequency.setValueAtTime(1600, t + 0.04);
+                    gain.gain.setValueAtTime(0.1, t);
+                    gain.gain.exponentialRampToValueAtTime(0.001, t + 0.09);
+                    osc.start(t);
+                    osc.stop(t + 0.09);
+                } else if (type === 'miss') { // Egg drop / splash
+                    osc.type = 'sawtooth';
+                    osc.frequency.setValueAtTime(300, t);
+                    osc.frequency.linearRampToValueAtTime(100, t + 0.25);
+                    gain.gain.setValueAtTime(0.15, t);
+                    gain.gain.exponentialRampToValueAtTime(0.001, t + 0.25);
+                    osc.start(t);
+                    osc.stop(t + 0.25);
+                } else if (type === 'gameover') { // Game over sequence
+                    osc.type = 'square';
+                    osc.frequency.setValueAtTime(400, t);
+                    osc.frequency.setValueAtTime(300, t + 0.15);
+                    osc.frequency.setValueAtTime(200, t + 0.3);
+                    gain.gain.setValueAtTime(0.15, t);
+                    gain.gain.exponentialRampToValueAtTime(0.001, t + 0.5);
+                    osc.start(t);
+                    osc.stop(t + 0.5);
+                }
+            } catch (e) {
+                console.error("Audio error", e);
+            }
+        }
+
+        // ================= GAME LOGIC & STATE =================
+        // Positions: 'UL' (Upper Left), 'DL' (Down Left), 'UR' (Upper Right), 'DR' (Down Right)
+        const POSITIONS = ['UL', 'DL', 'UR', 'DR'];
+
+        let gameState = 'IDLE'; // IDLE, PLAYING, GAMEOVER
+        let gameMode = 'A'; // 'A' (Standard) or 'B' (Faster & More Intense)
+        let score = 0;
+        let hiScore = parseInt(localStorage.getItem('lcd_wolf_hiscore')) || 0;
+        let misses = 0;
+        let catcherPos = 'UL'; // Default position
+
+        // Active eggs on tracks: Array of objects { id, lane: 'UL'|'DL'|'UR'|'DR', step: 0..3 }
+        let activeEggs = [];
+        let nextEggId = 1;
+
+        // Timing & Speed Variables
+        let tickInterval = 800; // Ms per tick step
+        let tickTimer = null;
+        let ticksCount = 0;
+
+        // UI Element References
+        const scoreText = document.getElementById('scoreText');
+        const hiScoreText = document.getElementById('hiScoreText');
+        const gameModeLabel = document.getElementById('gameModeLabel');
+        const lcdOverlay = document.getElementById('lcdOverlay');
+        const overlayTitle = document.getElementById('overlayTitle');
+        const overlayMessage = document.getElementById('overlayMessage');
+
+        hiScoreText.textContent = String(hiScore).padStart(4, '0');
+
+        // ================= RENDER FUNCTIONS =================
+        function updateDisplay() {
+            // 1. Clear all egg segments
+            POSITIONS.forEach(pos => {
+                for (let i = 0; i < 4; i++) {
+                    const seg = document.getElementById(`seg-egg-${pos}${i}`);
+                    if (seg) seg.classList.remove('active');
+                }
+            });
+
+            // 2. Clear ground miss splashes
+            document.getElementById('seg-miss-L').classList.remove('active');
+            document.getElementById('seg-miss-R').classList.remove('active');
+
+            // 3. Render Active Eggs
+            activeEggs.forEach(egg => {
+                const segId = `seg-egg-${egg.lane}${egg.step}`;
+                const seg = document.getElementById(segId);
+                if (seg) seg.classList.add('active');
+            });
+
+            // 4. Render Catcher Position
+            POSITIONS.forEach(pos => {
+                const seg = document.getElementById(`seg-catcher-${pos}`);
+                if (seg) {
+                    if (pos === catcherPos) seg.classList.add('active');
+                    else seg.classList.remove('active');
+                }
+            });
+
+            // 5. Render Miss Indicators (Broken Chicks at top)
+            for (let m = 1; m <= 3; m++) {
+                const missElem = document.getElementById(`miss${m}`);
+                if (m <= misses) {
+                    missElem.classList.add('active', 'miss-active');
+                } else {
+                    missElem.classList.remove('active', 'miss-active');
+                }
+            }
+
+            // 6. Update Score Display
+            scoreText.textContent = String(score).padStart(4, '0');
+        }
+
+        function setCatcherPos(pos) {
+            if (gameState !== 'PLAYING') return;
+            if (catcherPos !== pos) {
+                catcherPos = pos;
+                playBeep('move');
+                updateDisplay();
+            }
+        }
+
+        // ================= GAME TICK ENGINE =================
+        function gameTick() {
+            if (gameState !== 'PLAYING') return;
+
+            ticksCount++;
+            playBeep('tick');
+
+            let newEggList = [];
+            let missedThisTick = false;
+
+            // Advance existing eggs
+            for (let i = 0; i < activeEggs.length; i++) {
+                let egg = activeEggs[i];
+                
+                if (egg.step < 3) {
+                    // Move egg down ramp
+                    egg.step++;
+                    newEggList.push(egg);
+                } else if (egg.step === 3) {
+                    // Reached edge of ramp (Catch Zone!)
+                    if (catcherPos === egg.lane) {
+                        // Caught!
+                        score++;
+                        playBeep('catch');
+                        if (score > hiScore) {
+                            hiScore = score;
+                            localStorage.setItem('lcd_wolf_hiscore', hiScore);
+                            hiScoreText.textContent = String(hiScore).padStart(4, '0');
+                        }
+                    } else {
+                        // Missed! Drops to ground
+                        misses++;
+                        missedThisTick = true;
+                        playBeep('miss');
+
+                        // Show splash on ground corresponding to side
+                        const splashSeg = (egg.lane === 'UL' || egg.lane === 'DL') ? 'seg-miss-L' : 'seg-miss-R';
+                        document.getElementById(splashSeg).classList.add('active');
+                    }
+                }
+            }
+
+            activeEggs = newEggList;
+
+            // Check Game Over Condition
+            if (misses >= 3) {
+                endGame();
+                return;
+            }
+
+            // Spawn new egg periodically based on speed & mode
+            const spawnRate = gameMode === 'A' ? 3 : 2; // Spawn every N ticks
+            if (ticksCount % spawnRate === 0 || activeEggs.length === 0) {
+                // Pick random lane
+                const randomLane = POSITIONS[Math.floor(Math.random() * POSITIONS.length)];
+                activeEggs.push({
+                    id: nextEggId++,
+                    lane: randomLane,
+                    step: 0
+                });
+            }
+
+            // Dynamic Speed Escalation
+            // Every 10 points speeds up tick interval slightly
+            const speedLevel = Math.min(Math.floor(score / 10), 12);
+            tickInterval = Math.max(250, (gameMode === 'A' ? 700 : 500) - (speedLevel * 35));
+
+            updateDisplay();
+
+            // Schedule next tick
+            if (gameState === 'PLAYING') {
+                tickTimer = setTimeout(gameTick, tickInterval);
+            }
+        }
+
+        // ================= GAME LIFECYCLE =================
+        function startGame(mode = 'A') {
+            initAudio();
+            gameMode = mode;
+            gameModeLabel.textContent = `GAME ${mode}`;
+            gameState = 'PLAYING';
+            score = 0;
+            misses = 0;
+            ticksCount = 0;
+            activeEggs = [];
+            catcherPos = 'UL';
+            tickInterval = gameMode === 'A' ? 750 : 550;
+
+            lcdOverlay.classList.add('hidden');
+            updateDisplay();
+
+            if (tickTimer) clearTimeout(tickTimer);
+            tickTimer = setTimeout(gameTick, tickInterval);
+        }
+
+        function endGame() {
+            gameState = 'GAMEOVER';
+            if (tickTimer) clearTimeout(tickTimer);
+            playBeep('gameover');
+
+            overlayTitle.textContent = "GAME OVER";
+            overlayMessage.textContent = `Punkte: ${score} | Highscore: ${hiScore}`;
+            document.getElementById('startBtn').textContent = "ERNEUT SPIELEN";
+            lcdOverlay.classList.remove('hidden');
+            updateDisplay();
+        }
+
+        // ================= EVENT LISTENERS & CONTROLS =================
+        // On-Screen Handheld Buttons
+        document.getElementById('btnUL').addEventListener('click', () => { initAudio(); setCatcherPos('UL'); });
+        document.getElementById('btnDL').addEventListener('click', () => { initAudio(); setCatcherPos('DL'); });
+        document.getElementById('btnUR').addEventListener('click', () => { initAudio(); setCatcherPos('UR'); });
+        document.getElementById('btnDR').addEventListener('click', () => { initAudio(); setCatcherPos('DR'); });
+
+        document.getElementById('startBtn').addEventListener('click', () => startGame(gameMode));
+        document.getElementById('btnGameA').addEventListener('click', () => startGame('A'));
+        document.getElementById('btnGameB').addEventListener('click', () => startGame('B'));
+
+        // Keyboard Controls
+        window.addEventListener('keydown', (e) => {
+            if (gameState !== 'PLAYING') return;
+
+            const key = e.key.toLowerCase();
+            if (key === 'q' || key === 'w' || key === 'arrowup') {
+                setCatcherPos('UL');
+            } else if (key === 'a' || key === 's' || key === 'arrowleft') {
+                setCatcherPos('DL');
+            } else if (key === 'e' || key === 'i' || key === 'arrowright') {
+                setCatcherPos('UR');
+            } else if (key === 'd' || key === 'k' || key === 'arrowdown') {
+                setCatcherPos('DR');
+            }
+        });
+
+        // Initialize display ghost state on load
+        updateDisplay();
+    </script>
+</body>
+</html>
